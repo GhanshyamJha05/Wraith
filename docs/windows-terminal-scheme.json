@@ -1,0 +1,23 @@
+{
+  "name": "Wraith Spectral",
+  "background": "#0F0E17",
+  "foreground": "#E0DEF4",
+  "cursorColor": "#EBBCBA",
+  "selectionBackground": "#2A283E",
+  "black": "#191724",
+  "red": "#EB6F92",
+  "green": "#00FF66",
+  "yellow": "#FFB000",
+  "blue": "#9CCFD8",
+  "purple": "#B39DDB",
+  "cyan": "#31748F",
+  "white": "#E0DEF4",
+  "brightBlack": "#6E6A86",
+  "brightRed": "#EB6F92",
+  "brightGreen": "#56F996",
+  "brightYellow": "#FFA726",
+  "brightBlue": "#9CCFD8",
+  "brightPurple": "#C4A7E7",
+  "brightCyan": "#EBBCBA",
+  "brightWhite": "#FFFFFF"
+}

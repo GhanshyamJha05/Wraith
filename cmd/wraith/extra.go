@@ -2,11 +2,15 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"time"
 	"wraith/internal/config"
 	"wraith/internal/memory"
+	"wraith/internal/theme"
+	personas "wraith/personas"
 )
 
 // runSeance produces a spooky retrospective from the SQLite log
@@ -57,78 +61,142 @@ func runSeance(args []string) {
 
 // runDemo replays synthetic shell events demonstrating every trigger type
 func runDemo(args []string) {
-	debug := false
-	for _, a := range args {
-		if a == "--debug" {
-			debug = true
-		}
-	}
+	fs := flag.NewFlagSet("demo", flag.ContinueOnError)
+	debug := fs.Bool("debug", false, "Display whisper provenance debug overlay")
+	personaFlag := fs.String("persona", "victorian_ghost", "Persona to demonstrate, or 'all' for montage")
+	fx := fs.Bool("fx", false, "Ghost typing animation (capped at 300ms per whisper)")
+	plain := fs.Bool("plain", false, "Disable color and ANSI escapes")
+	_ = fs.Parse(args)
 
+	cfg := config.DefaultConfig()
+	reg, _ := personas.NewRegistry(filepath.Join(cfg.DataDir, "personas"))
+	colorLevel := theme.DetectColorLevel(*plain)
+
+	// Demo scenarios
 	demoEvents := []struct {
-		desc    string
+		persona string
 		cmd     string
-		exit    int
-		trigger string
 		overlay string
+		whisper string
 	}{
 		{
-			desc:    "Routine successful command",
+			persona: "victorian_ghost",
 			cmd:     "git status",
-			exit:    0,
-			trigger: "random",
 			overlay: " (gemma3:4b, 420ms)",
+			whisper: "A cold draught passes through the terminal; your files remain unsettled.",
 		},
 		{
-			desc:    "Dangerous recursive delete",
+			persona: "sysadmin",
 			cmd:     "rm -rf ./node_modules",
-			exit:    0,
-			trigger: "danger",
 			overlay: " (gemma3:4b, 510ms)",
+			whisper: "That command just gave your filesystem a viking funeral. Hope backups exist.",
 		},
 		{
-			desc:    "Repeated failed test run",
+			persona: "cobol",
 			cmd:     "go test ./...",
-			exit:    1,
-			trigger: "failure_streak",
 			overlay: " (gemma3:4b, 612ms)",
+			whisper: "ABEND S0C4 IN PARAGRAPH-01. RE-READ 80-COLUMN SPECIFICATION BEFORE RETRYING.",
 		},
 		{
-			desc:    "Late night git commit after midnight",
+			persona: "marigold",
 			cmd:     "git commit -m 'fix: urgent patch at 3am'",
-			exit:    0,
-			trigger: "late_night",
 			overlay: " (gemma3:4b, 490ms)",
+			whisper: "The altar accepts your effort; breathing softly brings clearer thoughts to the craft.",
 		},
 		{
-			desc:    "Model budget timeout fallback",
+			persona: "victorian_ghost",
 			cmd:     "docker compose up -d",
-			exit:    0,
-			trigger: "grimoire_fallback",
 			overlay: " (grimoire)",
+			whisper: "Cobwebs and dust welcome you back to this long-forsaken chamber.",
 		},
 	}
 
-	whispersSample := []string{
-		"A cold draught passes through the terminal; your files remain unsettled.",
-		"Such reckless excision would terrify even the graveyard sexton.",
-		"Four times you have summoned this error; it still refuses to leave.",
-		"Midnight has passed, and your eyes carry the dim pallor of tombs.",
-		"Cobwebs and dust welcome you back to this long-forsaken chamber.",
+	// Filter or montage
+	selectedPersona := strings.ToLower(strings.TrimSpace(*personaFlag))
+
+	// Themed Header
+	fmt.Println()
+	if *plain {
+		fmt.Printf("=== 👻 WRAITH SPECTRAL REPLAY (Mode: %s) ===\n", selectedPersona)
+	} else {
+		fmt.Printf("\033[38;2;179;157;219;1m=== 👻 WRAITH SPECTRAL REPLAY (Mode: %s) ===\033[0m\n", selectedPersona)
 	}
+	time.Sleep(200 * time.Millisecond)
 
-	fmt.Println("🎬 [wraith demo] Simulating terminal session haunting...")
-	time.Sleep(400 * time.Millisecond)
-
-	for i, d := range demoEvents {
-		fmt.Printf("\n> %s\n", d.cmd)
-		time.Sleep(300 * time.Millisecond)
-		tag := ""
-		if debug {
-			tag = d.overlay
+	for _, d := range demoEvents {
+		activePName := d.persona
+		if selectedPersona != "all" && selectedPersona != "" {
+			activePName = selectedPersona
 		}
-		fmt.Printf("\033[90m👻 %s%s\033[0m\n", whispersSample[i%len(whispersSample)], tag)
-		time.Sleep(400 * time.Millisecond)
+
+		p, ok := reg.Get(activePName)
+		if !ok {
+			p, _ = reg.Get("victorian_ghost")
+		}
+
+		// Prompt line
+		fmt.Printf("\n> %s\n", d.cmd)
+		time.Sleep(150 * time.Millisecond)
+
+		overlay := ""
+		if *debug {
+			overlay = d.overlay
+		}
+
+		// Style whisper with persona skin
+		styled := theme.StyleWhisper(d.whisper, p.Skin, colorLevel)
+
+		// Optional Ghost-typing effect (Strictly capped at 300ms max per whisper)
+		if *fx && colorLevel != theme.ColorNone {
+			printGhostTyping(styled, 300*time.Millisecond)
+		} else {
+			fmt.Print(styled)
+		}
+
+		if overlay != "" {
+			fmt.Printf(" %s", overlay)
+		}
+		fmt.Println()
+		time.Sleep(250 * time.Millisecond)
 	}
 
-	fmt.Println("\n✨ [wraith demo] Replay complete.")
+	// Themed Footer
+	fmt.Println()
+	if *plain {
+		fmt.Println("=== 🕯️  Replay complete. The parlor quiets. ===")
+	} else {
+		fmt.Println("\033[38;2;179;157;219;3m=== 🕯️  Replay complete. The parlor quiets. ===\033[0m")
+	}
+}
+
+// printGhostTyping outputs text rune-by-rune within a hard maximum budget of 300ms
+func printGhostTyping(text string, maxDuration time.Duration) {
+	runes := []rune(text)
+	if len(runes) == 0 {
+		return
+	}
+
+	// Calculate delay per rune so total time <= maxDuration
+	delay := maxDuration / time.Duration(len(runes))
+	if delay > 12*time.Millisecond {
+		delay = 12 * time.Millisecond
+	}
+
+	inEscape := false
+	for _, r := range runes {
+		if r == '\033' {
+			inEscape = true
+		}
+
+		fmt.Printf("%c", r)
+
+		if inEscape {
+			if r == 'm' {
+				inEscape = false
+			}
+			continue
+		}
+
+		time.Sleep(delay)
+	}
 }

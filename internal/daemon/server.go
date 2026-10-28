@@ -32,6 +32,7 @@ type IngestRequest struct {
 // IngestResponse returns the computed whisper
 type IngestResponse struct {
 	Whisper  string               `json:"whisper"`
+	Persona  string               `json:"persona"`
 	Source   memory.WhisperSource `json:"source"`
 	ModelTag string               `json:"model_tag"`
 	Latency  int64                `json:"latency_ms"`
@@ -99,26 +100,29 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	if s.store != nil {
 		_ = s.store.Close()
 	}
-	return s.httpServer.Shutdown(ctx)
+	if s.httpServer != nil {
+		return s.httpServer.Shutdown(ctx)
+	}
+	return nil
 }
 
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	s.mu.RLock()
-	defer s.mu.RUnlock()
+	cfg := *s.cfg
+	s.mu.RUnlock()
 
-	ollamaErr := s.ollama.Ping(r.Context())
-	reachable := ollamaErr == nil
-
-	recent, _ := s.store.GetRecentSources(r.Context(), 20)
+	modelReachable := s.ollama.Ping(r.Context()) == nil
+	recentEvents, _ := s.store.GetRecentSources(r.Context(), 5)
 
 	resp := map[string]interface{}{
 		"daemon":          "running",
-		"ollama_url":      s.cfg.OllamaURL,
-		"model":           s.cfg.Model,
-		"model_reachable": reachable,
-		"persona":         s.cfg.Persona,
-		"hushed":          s.cfg.Hushed,
-		"recent_whispers": recent,
+		"port":            cfg.Port,
+		"model":           cfg.Model,
+		"ollama_url":      cfg.OllamaURL,
+		"model_reachable": modelReachable,
+		"persona":         cfg.Persona,
+		"hushed":          cfg.Hushed,
+		"recent_whispers": recentEvents,
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -129,16 +133,18 @@ func (s *Server) handleHush(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.cfg.Hushed = true
 	s.mu.Unlock()
+
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"hushed"}`))
+	_ = json.NewEncoder(w).Encode(map[string]bool{"hushed": true})
 }
 
 func (s *Server) handleWake(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.cfg.Hushed = false
 	s.mu.Unlock()
+
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(`{"status":"awake"}`))
+	_ = json.NewEncoder(w).Encode(map[string]bool{"hushed": false})
 }
 
 func (s *Server) handlePersona(w http.ResponseWriter, r *http.Request) {
@@ -181,7 +187,6 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 	// 1. Redact secrets first (Rule 6)
 	redactionRes := redact.Redact(req.Command)
 	if redactionRes.SkipHaunting {
-		// Log event as silent for safety
 		_ = s.store.RecordEvent(r.Context(), memory.ShellEvent{
 			Timestamp:       start,
 			Shell:           req.Shell,
@@ -192,7 +197,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			WhisperText:     "",
 			Source:          memory.SourceSilent,
 		})
-		json.NewEncoder(w).Encode(IngestResponse{Source: memory.SourceSilent})
+		json.NewEncoder(w).Encode(IngestResponse{Source: memory.SourceSilent, Persona: cfg.Persona})
 		return
 	}
 
@@ -209,7 +214,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 			WhisperText:     "",
 			Source:          memory.SourceSilent,
 		})
-		json.NewEncoder(w).Encode(IngestResponse{Source: memory.SourceSilent})
+		json.NewEncoder(w).Encode(IngestResponse{Source: memory.SourceSilent, Persona: cfg.Persona})
 		return
 	}
 
@@ -282,6 +287,7 @@ func (s *Server) handleIngest(w http.ResponseWriter, r *http.Request) {
 
 	resp := IngestResponse{
 		Whisper:  whisper,
+		Persona:  cfg.Persona,
 		Source:   source,
 		ModelTag: cfg.Model,
 		Latency:  latencyMs,

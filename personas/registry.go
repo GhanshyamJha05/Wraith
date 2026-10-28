@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"wraith/internal/theme"
 )
 
 // Embedded default personas so Wraith runs self-contained
@@ -14,12 +16,13 @@ import (
 //go:embed *.yaml
 var embeddedPersonas embed.FS
 
-// Persona holds metadata and prompting instructions for a ghost identity
+// Persona holds metadata, prompting instructions, and visual skin for a ghost identity
 type Persona struct {
 	Name         string
 	Title        string
 	Description  string
 	SystemPrompt string
+	Skin         theme.Skin
 }
 
 // Registry manages loaded personas
@@ -86,19 +89,31 @@ func (r *Registry) List() []Persona {
 	return list
 }
 
-// parseSimpleYAML parses basic key-value and multiline strings without third-party YAML deps
+// parseSimpleYAML parses basic key-value, sections, and multiline strings without third-party YAML deps
 func parseSimpleYAML(content string) (Persona, error) {
 	var p Persona
+	// Default skin fallback
+	p.Skin = theme.Skin{
+		Marker:      "👻",
+		MarkerPlain: "[*]",
+		Color: theme.ColorDef{
+			TrueColorHex: "#A0A0A0",
+			Color256:     245,
+			Color16:      90,
+		},
+	}
+
 	scanner := bufio.NewScanner(strings.NewReader(content))
 	var multilineKey string
 	var multilineVal strings.Builder
+	var activeSection string
 
 	for scanner.Scan() {
-		line := scanner.Text()
+		rawLine := scanner.Text()
 
 		if multilineKey != "" {
-			if strings.HasPrefix(line, "  ") || strings.TrimSpace(line) == "" {
-				multilineVal.WriteString(strings.TrimPrefix(line, "  ") + "\n")
+			if strings.HasPrefix(rawLine, "  ") || strings.TrimSpace(rawLine) == "" {
+				multilineVal.WriteString(strings.TrimPrefix(rawLine, "  ") + "\n")
 				continue
 			} else {
 				if multilineKey == "system_prompt" {
@@ -109,7 +124,7 @@ func parseSimpleYAML(content string) (Persona, error) {
 			}
 		}
 
-		trimmed := strings.TrimSpace(line)
+		trimmed := strings.TrimSpace(rawLine)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
@@ -122,8 +137,49 @@ func parseSimpleYAML(content string) (Persona, error) {
 		key := strings.TrimSpace(parts[0])
 		val := strings.TrimSpace(parts[1])
 
+		// Check top-level sections
+		if !strings.HasPrefix(rawLine, " ") && val == "" {
+			activeSection = key
+			continue
+		}
+
 		if val == "|" {
 			multilineKey = key
+			continue
+		}
+
+		// Strip quotes if present
+		val = strings.Trim(val, `"'`)
+
+		if activeSection == "skin" {
+			switch key {
+			case "marker":
+				p.Skin.Marker = val
+			case "marker_plain":
+				p.Skin.MarkerPlain = val
+			case "line_prefix":
+				p.Skin.LinePrefix = val
+			case "truecolor":
+				p.Skin.Color.TrueColorHex = val
+			case "color256":
+				if n, err := strconv.Atoi(val); err == nil {
+					p.Skin.Color.Color256 = n
+				}
+			case "color16":
+				if n, err := strconv.Atoi(val); err == nil {
+					p.Skin.Color.Color16 = n
+				}
+			case "italic":
+				p.Skin.Style.Italic = (val == "true")
+			case "bold":
+				p.Skin.Style.Bold = (val == "true")
+			case "dim":
+				p.Skin.Style.Dim = (val == "true")
+			case "uppercase":
+				p.Skin.Style.Uppercase = (val == "true")
+			case "quote_style":
+				p.Skin.QuoteStyle = (val == "true")
+			}
 			continue
 		}
 

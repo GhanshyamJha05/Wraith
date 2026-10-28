@@ -17,10 +17,11 @@ import (
 	"wraith/internal/daemon"
 	"wraith/internal/hook"
 	"wraith/internal/memory"
+	"wraith/internal/theme"
 	personas "wraith/personas"
 )
 
-const version = "0.1.0-alpha"
+const version = "0.2.0-visual"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -54,6 +55,8 @@ func main() {
 		runDemo(subArgs)
 	case "seance":
 		runSeance(subArgs)
+	case "theme":
+		runTheme(subArgs)
 	case "version":
 		fmt.Printf("wraith v%s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 	default:
@@ -64,9 +67,8 @@ func main() {
 }
 
 func printHelp() {
-	fmt.Println(`👻 WRAITH: A Haunted Terminal (runs 100% offline via Ollama)
-
-Usage:
+	fmt.Print(theme.GhostBanner(false))
+	fmt.Println(`Usage:
   wraith <command> [options]
 
 Commands:
@@ -79,6 +81,7 @@ Commands:
   daemon      Run the local background whisper daemon (127.0.0.1)
   hook        Internal hook dispatcher called by shell prompt
   demo        Replay a scripted demonstration of ghost triggers
+  theme       Print Windows Terminal color scheme JSON and instructions
   seance      Generate a spooky summary of your past shell sessions
   purge       Delete all stored telemetry and memory database
   version     Display Wraith version info`)
@@ -122,9 +125,9 @@ func runHook(args []string) {
 	cmd := fs.String("cmd", "", "Executed command")
 	port := fs.Int("port", config.DefaultPort, "Daemon port")
 	budget := fs.Int("budget-ms", config.DefaultBudgetMs, "Max wait budget")
+	plain := fs.Bool("plain", false, "Disable color and ANSI escapes")
 	_ = fs.Parse(args[1:])
 
-	// Auto-start daemon in background if not answering
 	daemonURL := fmt.Sprintf("http://127.0.0.1:%d/ingest", *port)
 	cwd, _ := os.Getwd()
 
@@ -145,7 +148,6 @@ func runHook(args []string) {
 
 	resp, err := client.Post(daemonURL, "application/json", bytes.NewReader(payloadBytes))
 	if err != nil {
-		// Attempt daemon background spawn
 		spawnDaemonInBackground()
 		return
 	}
@@ -155,9 +157,24 @@ func runHook(args []string) {
 		var ingestResp daemon.IngestResponse
 		if err := json.NewDecoder(resp.Body).Decode(&ingestResp); err == nil {
 			if ingestResp.Whisper != "" {
-				// Dim spooky grey styling (\033[90m ... \033[0m)
+				// Load persona skin from registry for styling
+				reg, _ := personas.NewRegistry("")
+				var skin theme.Skin
+				if p, ok := reg.Get(ingestResp.Persona); ok {
+					skin = p.Skin
+				} else {
+					skin = theme.Skin{
+						Marker:      "👻",
+						MarkerPlain: "[*]",
+						Color:       theme.ColorDef{TrueColorHex: "#B39DDB", Color256: 183, Color16: 95},
+						Style:       theme.TextStyle{Italic: true},
+					}
+				}
+
+				level := theme.DetectColorLevel(*plain)
+				styled := theme.StyleWhisper(ingestResp.Whisper, skin, level)
 				overlay := ingestResp.Overlay
-				fmt.Printf("\033[90m👻 %s%s\033[0m\n", ingestResp.Whisper, overlay)
+				fmt.Printf("%s%s\n", styled, overlay)
 			}
 		}
 	}
@@ -174,12 +191,17 @@ func spawnDaemonInBackground() {
 }
 
 func runStatus(args []string) {
+	fs := flag.NewFlagSet("status", flag.ContinueOnError)
+	plain := fs.Bool("plain", false, "Plain ASCII output without color")
+	_ = fs.Parse(args)
+
 	cfg := config.DefaultConfig()
 	url := fmt.Sprintf("http://127.0.0.1:%d/status", cfg.Port)
 
 	client := &http.Client{Timeout: 1 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
+		fmt.Println(theme.StatusHeader(*plain, cfg.Persona, true))
 		fmt.Printf("Daemon: NOT RUNNING (offline at 127.0.0.1:%d)\n", cfg.Port)
 		fmt.Printf("Run 'wraith daemon' or execute any shell command with hook installed to wake it.\n")
 		return
@@ -192,7 +214,13 @@ func runStatus(args []string) {
 		return
 	}
 
-	fmt.Printf("👻 Wraith Status\n")
+	hushed := false
+	if h, ok := data["hushed"].(bool); ok {
+		hushed = h
+	}
+	activePersona := fmt.Sprintf("%v", data["persona"])
+
+	fmt.Println(theme.StatusHeader(*plain, activePersona, hushed))
 	fmt.Printf("  Daemon:          %v\n", data["daemon"])
 	fmt.Printf("  Ollama URL:      %v\n", data["ollama_url"])
 	fmt.Printf("  Model:           %v (Reachable: %v)\n", data["model"], data["model_reachable"])
@@ -212,6 +240,10 @@ func runStatus(args []string) {
 }
 
 func runHaunt(args []string) {
+	fs := flag.NewFlagSet("haunt", flag.ContinueOnError)
+	plain := fs.Bool("plain", false, "Disable color in preview")
+	_ = fs.Parse(args)
+
 	shellType := detectShell()
 	profilePath, err := hook.GetProfilePath(shellType)
 	if err != nil {
@@ -234,6 +266,8 @@ func runHaunt(args []string) {
 		return
 	}
 
+	// ASCII ghost banner and themed prompt ceremony
+	fmt.Print(theme.GhostBanner(*plain))
 	fmt.Println("=================================================================")
 	fmt.Println("👻 WRAITH PROFILE MODIFICATION PREVIEW (Opt-In Transparency)")
 	fmt.Println("=================================================================")
@@ -242,14 +276,14 @@ func runHaunt(args []string) {
 	fmt.Println("-----------------------------------------------------------------")
 	fmt.Print(res.DiffLines)
 	fmt.Println("-----------------------------------------------------------------")
-	fmt.Print("Do you want to proceed with installing Wraith into your profile? [y/N]: ")
+	fmt.Print("🕯️  Awaken the specter within this shell parlor? [y/N]: ")
 
 	var answer string
 	fmt.Scanln(&answer)
 	answer = strings.ToLower(strings.TrimSpace(answer))
 
 	if answer != "y" && answer != "yes" {
-		fmt.Println("Aborted. No modifications were made.")
+		fmt.Println("Aborted. The ghosts remain in slumber. No modifications were made.")
 		return
 	}
 
@@ -268,6 +302,10 @@ func runHaunt(args []string) {
 }
 
 func runExorcise(args []string) {
+	fs := flag.NewFlagSet("exorcise", flag.ContinueOnError)
+	plain := fs.Bool("plain", false, "Disable colored farewell ceremony")
+	_ = fs.Parse(args)
+
 	shellType := detectShell()
 	profilePath, err := hook.GetProfilePath(shellType)
 	if err != nil {
@@ -282,7 +320,7 @@ func runExorcise(args []string) {
 	}
 
 	if removed {
-		fmt.Printf("🪦 Wraith has been cleanly exorcised from: %s\n", profilePath)
+		fmt.Print(theme.FarewellCeremony(*plain, profilePath))
 	} else {
 		fmt.Printf("No Wraith hook was found in: %s\n", profilePath)
 	}
@@ -356,10 +394,19 @@ func runPersona(args []string) {
 	fmt.Printf("🎭 Active ghost persona changed to: %q\n", target)
 }
 
+func runTheme(args []string) {
+	fmt.Println("🎨 WRAITH SPECTRAL THEME (Windows Terminal)")
+	fmt.Println("-----------------------------------------------------------------")
+	fmt.Println(theme.ThemeInstructions())
+	fmt.Println("JSON Snippet to copy:")
+	fmt.Println(theme.WindowsTerminalSchemeJSON)
+	fmt.Println("-----------------------------------------------------------------")
+	fmt.Println("File also available at: docs/windows-terminal-scheme.json")
+}
+
 func detectShell() hook.ShellType {
 	if runtime.GOOS == "windows" {
 		if os.Getenv("PSModulePath") != "" {
-			// Check if running under PowerShell Core (pwsh) or Windows PowerShell
 			if strings.Contains(strings.ToLower(os.Getenv("POWERSHELL_DISTRIBUTION_CHANNEL")), "core") {
 				return hook.ShellPwsh
 			}

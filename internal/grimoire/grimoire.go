@@ -2,6 +2,7 @@ package grimoire
 
 import (
 	"math/rand"
+	"strings"
 )
 
 // Grimoire holds pre-written whispers organized by Persona and Trigger type.
@@ -113,10 +114,77 @@ var whispers = map[string]map[string][]string{
 			"Died quietly. At least check the manpage once.",
 		},
 	},
+	"cobol": {
+		"failure_streak": {
+			"ABEND S0C4 IN PARAGRAPH-01. RE-READ 80-COLUMN SPECIFICATION.",
+			"PERFORM ERROR-RECOVERY UNTIL USER UNDERSTANDS COMPILATION.",
+			"FIFTH EXECUTION CYCLE FAILED. MAINFRAME DOWNTIME SCHEDULED.",
+			"COND CODE 0016. TAPE DRIVE REJECTS REPETITIVE INVALID RECORD.",
+			"SYNTAX PARSING TERMINATED WITH UNRECOVERABLE SEQUENCE FAULT.",
+		},
+		"danger": {
+			"DELETION OF MASTER VOLUME WITHOUT TAPE BACKUP CANNOT BE AUTHORIZED.",
+			"CRITICAL DATA DIVISION CORRUPTION IMMINENT. HALT JOB IMMEDIATELY.",
+			"OVERWRITING SEQUENTIAL DATASET. 1974 RECOVERY PROCEDURES REQUIRED.",
+			"UNCHECKED PRIVILEGED EXECUTION WILL DESTROY PARAGRAPH ALIGNMENT.",
+		},
+		"late_night": {
+			"BATCH WINDOW CLOSED AT MIDNIGHT. PUNCHCARD OPERATOR HAS RETIRED.",
+			"MAINFRAME CLOCK REGISTERS 0300 HOURS. COMMENCE SCHEDULED REBOOT.",
+			"OPERATOR FATIGUE DETECTED IN TERMINAL BUFFER. SUBMIT SHUTDOWN JCL.",
+			"THE NIGHT SHIFT HAS PASSED. WRITE OUTPUT TO SPOOL AND SLEEP.",
+		},
+		"stale_directory": {
+			"RECORD RETRIEVED FROM ARCHIVAL TAPE VAULT AFTER DORMANT CYCLE.",
+			"HISTORICAL DATASET MOUNTED. COLUMNAR ALIGNMENT DUSTED OFF.",
+			"DORMANT SOURCE CODE LOCATED. IDENTIFICATION DIVISION UNALTERED SINCE 1999.",
+			"ANCIENT SUBROUTINE DETECTED. PREPARE Y2K COMPLIANCE AUDIT.",
+		},
+		"general_failure": {
+			"COMPILATION ERROR: COND CODE NON-ZERO. CHECK DIAGNOSTIC LISTING.",
+			"EXECUTION HALTED: ABNORMAL TERMINATION IN PROCEDURE DIVISION.",
+			"INVALID FILE STATUS 35: TARGET RESOURCE NOT FOUND ON STORAGE DRUM.",
+			"SYNTAX CHECK FAILED: PERIOD MISSING AT END OF STATEMENT SENTENCE.",
+		},
+	},
+	"marigold": {
+		"failure_streak": {
+			"Each stumble is only a petal laid upon the path of learning.",
+			"Do not despair, dear heart; even ancient masters broke their scripts.",
+			"A small fracture in the craft; rest, and let the embers cool.",
+			"We remember every line you have written, and we are proud of your trial.",
+			"The altar accepts your effort; breathing softly brings clearer thoughts.",
+		},
+		"danger": {
+			"Take gentle care with the sharp edges of the machine, sweet soul.",
+			"So swift a farewell to your files; let us hope their memory lingers.",
+			"A sweeping wind across the garden; walk softly when cutting deep.",
+			"Be mindful with your deletions; old work carried heart and time.",
+		},
+		"late_night": {
+			"The stars watch over you, but weary eyes deserve gentle slumber.",
+			"The spirits sing of rest tonight; close your screen and dream.",
+			"Your craft will wait for morning dawn; go warm your hands.",
+			"Sweet traveler of the terminal, night has cloaked the garden.",
+		},
+		"stale_directory": {
+			"Welcome back to this quiet garden; your old ideas have waited patiently.",
+			"We kept a candle burning in this room while you were away.",
+			"A gentle reunion with forgotten drafts; they greet you with petals.",
+			"Nothing truly perishes here; your old work smiles to see you again.",
+		},
+		"general_failure": {
+			"A tender sigh from the hearth; try once more when ready.",
+			"The machine stumbled, but your creativity remains whole.",
+			"A quiet mishap; sprinkle sugar on the prompt and begin anew.",
+			"Not every song finds its chord on the first stroke, beloved maker.",
+		},
+	},
 }
 
 // GetWhisper selects a pre-written whisper for the persona and trigger category
 func GetWhisper(persona string, trigger string) string {
+	persona = strings.ToLower(persona)
 	personaMap, ok := whispers[persona]
 	if !ok {
 		// Fallback to victorian_ghost
