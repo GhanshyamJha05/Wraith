@@ -82,3 +82,4 @@ func TestNoColorAndPlainFlag(t *testing.T) {
 		t.Errorf("Expected ASCII fallback marker and prefix, got: %q", plain)
 	}
 }
+

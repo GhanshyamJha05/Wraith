@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -27,16 +28,38 @@ type Config struct {
 	DebugOverlay bool    `json:"debug_overlay"`
 }
 
-// GetDataDir returns the standard data directory for Wraith
+// GetDataDir returns the standard OS user data directory for Wraith
+// Windows: %LOCALAPPDATA%\wraith
+// Linux:   $XDG_DATA_HOME/wraith or ~/.local/share/wraith
+// macOS:   ~/Library/Application Support/wraith
 func GetDataDir() string {
 	if custom := os.Getenv("WRAITH_DATA_DIR"); custom != "" {
 		return custom
 	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ".wraith"
+
+	switch runtime.GOOS {
+	case "windows":
+		if localAppData := os.Getenv("LOCALAPPDATA"); localAppData != "" {
+			return filepath.Join(localAppData, "wraith")
+		}
+	case "darwin":
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, "Library", "Application Support", "wraith")
+		}
+	default: // Linux / Unix / BSD
+		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+			return filepath.Join(xdg, "wraith")
+		}
+		if home, err := os.UserHomeDir(); err == nil {
+			return filepath.Join(home, ".local", "share", "wraith")
+		}
 	}
-	return filepath.Join(home, ".wraith")
+
+	// Fallback to user home
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".wraith")
+	}
+	return ".wraith"
 }
 
 // DefaultConfig returns safe defaults

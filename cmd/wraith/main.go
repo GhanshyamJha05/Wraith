@@ -55,6 +55,8 @@ func main() {
 		runDemo(subArgs)
 	case "seance":
 		runSeance(subArgs)
+	case "doctor":
+		runDoctor(subArgs)
 	case "theme":
 		runTheme(subArgs)
 	case "version":
@@ -81,6 +83,7 @@ Commands:
   daemon      Run the local background whisper daemon (127.0.0.1)
   hook        Internal hook dispatcher called by shell prompt
   demo        Replay a scripted demonstration of ghost triggers
+  doctor      Run system environment diagnostics and exit-code self-test
   theme       Print Windows Terminal color scheme JSON and instructions
   seance      Generate a spooky summary of your past shell sessions
   purge       Delete all stored telemetry and memory database

@@ -179,3 +179,4 @@ func hexToRGB(hex string) (int, int, int, error) {
 	}
 	return r, g, b, nil
 }
+

@@ -44,3 +44,4 @@ func StatusHeader(plain bool, persona string, hushed bool) string {
 	}
 	return colorCode + "👻 === WRAITH SPECTRAL STATUS [" + statusTag + "] ===" + "\033[0m"
 }
+

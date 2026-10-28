@@ -35,3 +35,4 @@ func ThemeInstructions() string {
 4. Save settings.json and set "colorScheme": "Wraith Spectral" in your profile default.
 `
 }
+

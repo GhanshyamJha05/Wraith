@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+        go-version: [ '1.24' ]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          check-latest: true
+          cache: true
+
+      - name: Go Vet
+        run: go vet ./...
+
+      - name: Unit Tests
+        run: go test -v -race ./...
+        if: matrix.os != 'windows-latest'
+
+      - name: Unit Tests (Windows)
+        run: go test -v ./...
+        if: matrix.os == 'windows-latest'
+
+      - name: Fuzz Testing (Sanitizer 5s)
+        run: go test -fuzz=FuzzSanitizer -fuzztime=5s ./internal/sanitize
+
+      - name: Build Binary
+        run: go build -v -o wraith-test-bin ./cmd/wraith
+        if: matrix.os != 'windows-latest'
+
+      - name: Build Binary (Windows)
+        run: go build -v -o wraith-test-bin.exe ./cmd/wraith
+        if: matrix.os == 'windows-latest'
+

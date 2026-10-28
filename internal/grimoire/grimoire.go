@@ -180,6 +180,30 @@ var whispers = map[string]map[string][]string{
 			"Not every song finds its chord on the first stroke, beloved maker.",
 		},
 	},
+	"helper": {
+		"failure_streak": {
+			"This command has failed multiple times in a row; checking preceding error logs might reveal the root issue.",
+			"Repeated failures often indicate a missing prerequisite or an unhandled environment variable.",
+			"The previous commands did not succeed; reviewing the specific error message line is recommended.",
+		},
+		"danger": {
+			"This command performs large-scale filesystem modifications; verify paths before proceeding.",
+			"Recursive deletion operations are irreversible; ensuring backup copies exist is strongly advised.",
+		},
+		"late_night": {
+			"Late hours can reduce debugging accuracy; a break can provide fresh perspective tomorrow.",
+			"It is late in the evening; reviewing complex code changes with rested eyes often helps.",
+		},
+		"stale_directory": {
+			"This folder has not been accessed recently; dependency updates or lockfiles may need a check.",
+			"Navigated to an older project directory; reviewing the README or git log can help refresh context.",
+		},
+		"general_failure": {
+			"The command exited with a non-zero status code, indicating an execution error.",
+			"A command execution problem occurred; inspect the output above for diagnostic clues.",
+			"The shell received an error status from the process; checking parameters or permissions may help.",
+		},
+	},
 }
 
 // GetWhisper selects a pre-written whisper for the persona and trigger category

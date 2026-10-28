@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    name: Cross-Compile & Publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+
+      - name: Build Cross-Platform Binaries
+        run: |
+          mkdir -p dist
+          
+          # Matrix definitions
+          PLATFORMS=(
+            "windows/amd64/.exe"
+            "windows/arm64/.exe"
+            "linux/amd64/"
+            "linux/arm64/"
+            "darwin/amd64/"
+            "darwin/arm64/"
+          )
+
+          for PLATFORM in "${PLATFORMS[@]}"; do
+            IFS="/" read -r OS ARCH EXT <<< "$PLATFORM"
+            OUTPUT_NAME="wraith-${OS}-${ARCH}${EXT}"
+            echo "Compiling for ${OS}/${ARCH} -> ${OUTPUT_NAME}..."
+            
+            GOOS=$OS GOARCH=$ARCH CGO_ENABLED=0 go build -ldflags="-s -w" -o "dist/${OUTPUT_NAME}" ./cmd/wraith
+          done
+
+      - name: Generate Checksums
+        working-directory: dist
+        run: |
+          sha256sum wraith-* > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        id: create_release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Wraith ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Binaries & Checksums
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" dist/*
+

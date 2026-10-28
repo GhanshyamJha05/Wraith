@@ -98,6 +98,11 @@ func InstallHook(profilePath string, shell ShellType, binaryPath string, port in
 	return res, nil
 }
 
+// HasHook checks if content contains the Wraith hook marker
+func HasHook(content string) bool {
+	return strings.Contains(content, MarkerStart)
+}
+
 // ExorciseHook removes the hook from the profile cleanly
 func ExorciseHook(profilePath string) (bool, error) {
 	if _, err := os.Stat(profilePath); os.IsNotExist(err) {
